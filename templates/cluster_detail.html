@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Cluster #{{ cluster.cluster_number }} - Learning Sequence Manager{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('index') }}">DATABASE</a></li>
+            <li class="breadcrumb-item active">CLUSTERS.ID={{ cluster.cluster_number }}</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <!-- Main Content -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    TABLE: CLUSTERS - RECORD #{{ cluster.cluster_number }} [{{ cluster.year_level_name }}] [{{ cluster.strand_name }}] [{{ 'PUBLISHED' if cluster.is_published else 'DRAFT' }}]
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('cluster_edit', cluster_id=cluster.id) }}">
+                        <table style="margin-bottom: 1rem; background-color: #ffffff;">
+                            <tr>
+                                <th style="width: 180px;">FIELD</th>
+                                <th>VALUE</th>
+                            </tr>
+                            <tr>
+                                <td>cluster_number</td>
+                                <td>{{ cluster.cluster_number }}</td>
+                            </tr>
+                            <tr>
+                                <td>title</td>
+                                <td><input type="text" class="form-control" name="title" value="{{ cluster.title }}" required></td>
+                            </tr>
+                            <tr>
+                                <td>rationale</td>
+                                <td><textarea class="form-control" name="rationale" rows="3">{{ cluster.rationale or '' }}</textarea></td>
+                            </tr>
+                            <tr>
+                                <td>sequence_notes</td>
+                                <td><textarea class="form-control" name="sequence_notes" rows="3">{{ cluster.sequence_notes or '' }}</textarea></td>
+                            </tr>
+                            <tr>
+                                <td>is_published</td>
+                                <td>
+                                    <input type="checkbox" name="is_published" {% if cluster.is_published %}checked{% endif %}> 
+                                    {{ 'TRUE' if cluster.is_published else 'FALSE' }}
+                                </td>
+                            </tr>
+                        </table>
+                        <button type="submit" class="btn">[ SAVE CHANGES ]</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Elements -->
+            <div class="card mt-3" style="border: 2px solid #999999;">
+                <div class="card-header" style="background-color: #d8d8d8; color: #666666;">
+                    RELATED TABLE: CLUSTER_ELEMENTS ({{ elements|length }} RECORDS)
+                </div>
+                <div class="card-body" style="padding: 0; background-color: #f5f5f5;">
+                    {% if elements %}
+                    <table>
+                        <thead>
+                            <tr style="background-color: #777777;">
+                                <th style="background-color: #777777; width: 50px;">SEQ</th>
+                                <th style="background-color: #777777; width: 90px;">ELEMENT_ID</th>
+                                <th style="background-color: #777777;">TITLE</th>
+                                <th style="background-color: #777777; width: 100px;">CPA_STAGE</th>
+                                <th style="background-color: #777777; width: 100px;">LOAD</th>
+                                <th style="background-color: #777777; width: 90px;">STABILITY</th>
+                                <th style="background-color: #777777; width: 80px;">ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for element in elements %}
+                            <tr style="background-color: #ffffff;">
+                                <td style="border-color: #aaaaaa;">{{ loop.index }}</td>
+                                <td style="border-color: #aaaaaa;">{{ element.element_number }}</td>
+                                <td style="border-color: #aaaaaa; font-style: italic;">{{ element.title }}</td>
+                                <td style="border-color: #aaaaaa;">{{ element.cpa_name or 'NULL' }}</td>
+                                <td style="border-color: #aaaaaa;">{{ element.load_name or 'NULL' }}</td>
+                                <td style="border-color: #aaaaaa;">{{ element.stability_name or 'NULL' }}</td>
+                                <td style="border-color: #aaaaaa;"><a href="{{ url_for('element_detail', element_id=element.id) }}">[EDIT]</a></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <div style="padding: 0.5rem; background-color: #ffffff;">NO RECORDS</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Victorian Curriculum References -->
+            <div class="card">
+                <div class="card-header">
+                    RELATED TABLE: VC_REFERENCES
+                </div>
+                <div class="card-body" style="padding: 0;">
+                    {% if vc_refs %}
+                    <table style="background-color: #ffffff;">
+                        <thead>
+                            <tr>
+                                <th style="width: 120px;">VC_CODE</th>
+                                <th>DESCRIPTION</th>
+                                <th style="width: 100px;">ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ref in vc_refs %}
+                            <tr>
+                                <td>{{ ref.code }}</td>
+                                <td>{{ ref.description[:40] }}{% if ref.description|length > 40 %}...{% endif %}</td>
+                                <td>
+                                    <form method="POST" action="{{ url_for('cluster_remove_vc', cluster_id=cluster.id, vc_ref_id=ref.id) }}" style="display: inline;">
+                                        <button type="submit" class="btn" onclick="return confirm('DELETE?')">[DEL]</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <div style="padding: 0.5rem;">NO RECORDS</div>
+                    {% endif %}
+                    
+                    <div style="padding: 0.5rem; border-top: 1px solid #000000;">
+                        <form method="POST" action="{{ url_for('cluster_add_vc', cluster_id=cluster.id) }}">
+                            <div class="mb-2">
+                                INSERT INTO VC_REFERENCES:
+                                <select class="form-select" name="vc_code" required>
+                                    <option value="">SELECT...</option>
+                                    {% for vc in available_vc %}
+                                    <option value="{{ vc.code }}">{{ vc.code }} - {{ vc.strand }} ({{ vc.level_band }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <button type="submit" class="btn">[ ADD ]</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reference Materials -->
+            {% if cluster_resources %}
+            <div class="card mt-3">
+                <div class="card-header">
+                    RELATED TABLE: CLUSTER_RESOURCES ({{ cluster_resources|length }})
+                </div>
+                <div class="card-body" style="padding: 0;">
+                    <table style="background-color: #ffffff;">
+                        <thead>
+                            <tr>
+                                <th style="width: 100px;">TYPE</th>
+                                <th>TITLE</th>
+                                <th style="width: 150px;">ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for resource in cluster_resources %}
+                            <tr>
+                                <td>{{ resource.resource_type }}</td>
+                                <td>{{ resource.title }}</td>
+                                <td>
+                                    <a href="{{ url_for('cluster_resource_view', resource_id=resource.id) }}" target="_blank">[VIEW]</a> | 
+                                    <a href="{{ url_for('cluster_resource_download', resource_id=resource.id) }}">[DL]</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

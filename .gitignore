@@ -1,0 +1,30 @@
+# Environment variables — never commit these
+.env
+
+# Database — uploaded separately to Railway volume
+*.db
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Uploaded files
+uploads/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+*.txt
+audit_report.txt
+import_log.txt
+import_references_log.txt
+import_remaining_log.txt
+conversion_log.txt
+missing_files_full_list.txt
+
+# Research/working files (not needed in production)
+research/

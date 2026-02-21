@@ -1,0 +1,384 @@
+{% extends "base.html" %}
+
+{% block title %}Element #{{ element.element_number }} - Learning Sequence Manager{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ url_for('index') }}">DATABASE</a></li>
+            <li class="breadcrumb-item active">ELEMENTS.ID={{ element.element_number }}</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <!-- Main Content -->
+        <div class="col-lg-8">
+            <div class="card" style="border: 2px solid #999999;">
+                <div class="card-header" style="background-color: #d8d8d8; color: #666666;">
+                    TABLE: ELEMENTS - RECORD #{{ element.element_number }} [{{ element.cpa_name or 'NULL' }}] [{{ element.load_name or 'NULL' }}] [{{ element.stability_name or 'NULL' }}] [{{ 'PUBLISHED' if element.is_published else 'DRAFT' }}]
+                </div>
+                <div class="card-body" style="background-color: #f5f5f5;">
+                    <form method="POST" action="{{ url_for('element_edit', element_id=element.id) }}">
+                        <table style="margin-bottom: 1rem; background-color: #ffffff;">
+                            <tr style="background-color: #777777;">
+                                <th style="width: 180px; background-color: #777777;">FIELD</th>
+                                <th style="background-color: #777777;">VALUE</th>
+                            </tr>
+                            <tr>
+                                <td>element_number</td>
+                                <td>{{ element.element_number }}</td>
+                            </tr>
+                            <tr>
+                                <td>title</td>
+                                <td><input type="text" class="form-control" name="title" value="{{ element.title }}" required></td>
+                            </tr>
+                            <tr>
+                                <td>cpa_stage_id</td>
+                                <td>
+                                    <select class="form-select" name="cpa_stage_id">
+                                        <option value="">NULL</option>
+                                        {% for cpa in cpa_stages %}
+                                        <option value="{{ cpa.id }}" {% if element.cpa_stage_id == cpa.id %}selected{% endif %}>
+                                            {{ cpa.id }} - {{ cpa.name }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>intrinsic_load_id</td>
+                                <td>
+                                    <select class="form-select" name="intrinsic_load_id">
+                                        <option value="">NULL</option>
+                                        {% for load in load_levels %}
+                                        <option value="{{ load.id }}" {% if element.intrinsic_load_id == load.id %}selected{% endif %}>
+                                            {{ load.id }} - {{ load.name }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>concept_stability_id</td>
+                                <td>
+                                    <select class="form-select" name="concept_stability_id">
+                                        <option value="">NULL</option>
+                                        {% for s in stability_levels %}
+                                        <option value="{{ s.id }}" {% if element.concept_stability_id == s.id %}selected{% endif %}>
+                                            {{ s.id }} - {{ s.name }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>learning_objective</td>
+                                <td><textarea class="form-control" name="learning_objective" rows="2">{{ element.learning_objective or '' }}</textarea></td>
+                            </tr>
+                            <tr>
+                                <td>teacher_notes</td>
+                                <td><textarea class="form-control" name="teacher_notes" rows="3">{{ element.teacher_notes or '' }}</textarea></td>
+                            </tr>
+                            <tr>
+                                <td>audio_script</td>
+                                <td><textarea class="form-control" name="audio_script" rows="2">{{ element.audio_script or '' }}</textarea></td>
+                            </tr>
+                            <tr>
+                                <td>is_published</td>
+                                <td>
+                                    <input type="checkbox" name="is_published" {% if element.is_published %}checked{% endif %}> 
+                                    {{ 'TRUE' if element.is_published else 'FALSE' }}
+                                </td>
+                            </tr>
+                        </table>
+                        <button type="submit" class="btn">[ SAVE CHANGES ]</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <!-- Resources -->
+            <div class="card" style="border: 2px solid #999999;">
+                <div class="card-header" style="background-color: #d8d8d8; color: #666666;">
+                    RELATED TABLE: RESOURCES ({{ resources|length }} RECORDS)
+                </div>
+                <div class="card-body" style="padding: 0; background-color: #f5f5f5;">
+                    {% if resources %}
+                    <table style="background-color: #ffffff;">
+                        <thead>
+                            <tr style="background-color: #777777;">
+                                <th style="background-color: #777777; width: 60px;">ID</th>
+                                <th style="background-color: #777777; width: 120px;">CATEGORY</th>
+                                <th style="background-color: #777777;">TITLE</th>
+                                <th style="background-color: #777777; width: 70px;">FORMAT</th>
+                                <th style="background-color: #777777; width: 70px;">SIZE_KB</th>
+                                <th style="background-color: #777777; width: 220px;">ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% set current_category = namespace(name='') %}
+                        {% for resource in resources %}
+                            {% if current_category.name != resource.category_name %}
+                                {% set current_category.name = resource.category_name %}
+                                <tr style="background-color: #555555; color: #ffffff;">
+                                    <td colspan="6"><strong>▶ {{ resource.category_name }}</strong></td>
+                                </tr>
+                            {% endif %}
+                            <tr id="display-row-{{ resource.id }}">
+                                <td>{{ resource.id }}</td>
+                                <td>{{ resource.category_code }}</td>
+                                <td>{{ resource.title }}</td>
+                                <td>{{ resource.format_code }}</td>
+                                <td>{{ (resource.file_size_bytes / 1024)|round(1) if resource.file_size_bytes else '-' }}</td>
+                                <td>
+                                    {% if resource.format_code in ['PDF', 'IMG', 'PPTX'] %}
+                                        <button onclick="viewResource({{ loop.index0 }})" class="btn">[VIEW]</button>
+                                    {% else %}
+                                        <a href="{{ url_for('resource_download', resource_id=resource.id) }}" class="btn" style="text-decoration: none; color: #ffffff;">[DL]</a>
+                                    {% endif %}
+                                    <button onclick="toggleEditResource({{ resource.id }})" class="btn">[EDIT]</button>
+                                    <form method="POST" action="{{ url_for('resource_delete', resource_id=resource.id) }}" style="display: inline;">
+                                        <button type="submit" class="btn" onclick="return confirm('DELETE?')">[DEL]</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <tr id="edit-row-{{ resource.id }}" style="display: none;">
+                                <td colspan="6" style="padding: 0.5rem;">
+                                    <form method="POST" action="{{ url_for('resource_edit', resource_id=resource.id) }}">
+                                        <table style="width: 100%; margin: 0;">
+                                            <tr>
+                                                <td style="width: 90px;">title</td>
+                                                <td><input type="text" class="form-control" name="title" value="{{ resource.title }}" required></td>
+                                            </tr>
+                                            <tr>
+                                                <td>category</td>
+                                                <td>
+                                                    <select class="form-select" name="resource_category_id" required>
+                                                        {% for cat in resource_categories %}
+                                                        <option value="{{ cat.id }}" {% if cat.id == resource.resource_category_id %}selected{% endif %}>
+                                                            {{ cat.name }}
+                                                        </option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>audience</td>
+                                                <td>
+                                                    <select class="form-select" name="audience" required>
+                                                        <option value="both" {% if resource.audience == 'both' %}selected{% endif %}>both</option>
+                                                        <option value="teacher" {% if resource.audience == 'teacher' %}selected{% endif %}>teacher</option>
+                                                        <option value="student" {% if resource.audience == 'student' %}selected{% endif %}>student</option>
+                                                    </select>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>description</td>
+                                                <td><textarea class="form-control" name="description" rows="2">{{ resource.description or '' }}</textarea></td>
+                                            </tr>
+                                            <tr>
+                                                <td colspan="2">
+                                                    <button type="submit" class="btn">[ SAVE ]</button>
+                                                    <button type="button" class="btn" onclick="toggleEditResource({{ resource.id }})">[ CANCEL ]</button>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </form>
+                                </td>
+                            </tr>
+                            <tr id="viewer-{{ loop.index0 }}" style="display: none;">
+                                <td colspan="6" style="padding: 0.5rem;">
+                                    <div>VIEWING: {{ resource.title }} <button class="btn" onclick="closeViewer({{ loop.index0 }})">[ CLOSE ]</button></div>
+                                    <iframe id="frame-{{ loop.index0 }}" style="width: 100%; height: 400px; border: 1px solid #888888;" src=""></iframe>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <div style="padding: 0.5rem;">NO RECORDS</div>
+                    {% endif %}
+                    
+                    <div style="padding: 0.5rem; border-top: 1px solid #000000;">
+                        <div style="margin-bottom: 0.5rem;">INSERT INTO RESOURCES:</div>
+                        <form method="POST" action="{{ url_for('resource_upload', element_id=element.id) }}" enctype="multipart/form-data">
+                            <table style="width: 100%; margin-bottom: 0.5rem;">
+                                <tr>
+                                    <td style="width: 90px;">file</td>
+                                    <td><input type="file" class="form-control" name="file" accept=".pdf,.doc,.docx,.ppt,.pptx,.png,.jpg,.jpeg,.gif,.webp" required></td>
+                                </tr>
+                                <tr>
+                                    <td>title</td>
+                                    <td><input type="text" class="form-control" name="title" required></td>
+                                </tr>
+                                <tr>
+                                    <td>category</td>
+                                    <td>
+                                        <select class="form-select" name="resource_category_id" required>
+                                            <option value="">SELECT...</option>
+                                            {% for cat in resource_categories %}
+                                            <option value="{{ cat.id }}">{{ cat.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>audience</td>
+                                    <td>
+                                        <select class="form-select" name="audience" required>
+                                            <option value="both">both</option>
+                                            <option value="teacher">teacher</option>
+                                            <option value="student">student</option>
+                                        </select>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>description</td>
+                                    <td><textarea class="form-control" name="description" rows="2"></textarea></td>
+                                </tr>
+                            </table>
+                            <button type="submit" class="btn">[ UPLOAD FILE ]</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Appears in Clusters -->
+            <div class="card mt-2" style="border: 2px solid #999999;">
+                <div class="card-header" style="background-color: #d8d8d8; color: #666666;">
+                    RELATED TABLE: CLUSTER_ELEMENTS
+                </div>
+                <div class="card-body" style="padding: 0; background-color: #f5f5f5;">
+                    {% if clusters %}
+                    <table style="background-color: #ffffff;">
+                        <thead>
+                            <tr style="background-color: #777777;">
+                                <th style="background-color: #777777; width: 90px;">CLUSTER_ID</th>
+                                <th style="background-color: #777777; width: 120px;">YEAR_LEVEL</th>
+                                <th style="background-color: #777777;">TITLE</th>
+                                <th style="background-color: #777777; width: 80px;">ACTIONS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for cluster in clusters %}
+                            <tr>
+                                <td>{{ cluster.cluster_number }}</td>
+                                <td>{{ cluster.year_level_name }}</td>
+                                <td>{{ cluster.title }}</td>
+                                <td><a href="{{ url_for('cluster_detail', cluster_id=cluster.id) }}">[VIEW]</a></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <div style="padding: 0.5rem;">NO RECORDS</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Info -->
+            <div class="card mt-2" style="border: 2px solid #999999;">
+                <div class="card-header" style="background-color: #d8d8d8; color: #666666;">
+                    RECORD METADATA
+                </div>
+                <div class="card-body" style="padding: 0; background-color: #f5f5f5;">
+                    <table style="background-color: #ffffff;">
+                        <tr style="background-color: #777777;">
+                            <th style="background-color: #777777; width: 140px;">FIELD</th>
+                            <th style="background-color: #777777;">VALUE</th>
+                        </tr>
+                        <tr>
+                            <td>id</td>
+                            <td>{{ element.id }}</td>
+                        </tr>
+                        <tr>
+                            <td>element_number</td>
+                            <td>{{ element.element_number }}</td>
+                        </tr>
+                        {% if element.cpa_code %}
+                        <tr>
+                            <td>cpa_code</td>
+                            <td>{{ element.cpa_code }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if element.load_code %}
+                        <tr>
+                            <td>load_code</td>
+                            <td>{{ element.load_code }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if element.stability_code %}
+                        <tr>
+                            <td>stability_code</td>
+                            <td>{{ element.stability_code }}</td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Resources data for viewer URLs
+const resourceViewUrls = [
+    {% for resource in resources %}
+    {% if resource.format_code in ['PDF', 'IMG', 'PPTX'] %}
+    "{{ url_for('resource_view', resource_id=resource.id) }}"{% if not loop.last %},{% endif %}
+    {% endif %}
+    {% endfor %}
+];
+
+let currentOpenViewer = null;
+
+function viewResource(index) {
+    if (currentOpenViewer !== null) {
+        closeViewer(currentOpenViewer);
+    }
+    
+    const viewer = document.getElementById('viewer-' + index);
+    const frame = document.getElementById('frame-' + index);
+    
+    if (viewer && frame) {
+        viewer.style.display = 'table-row';
+        frame.src = resourceViewUrls[index];
+        currentOpenViewer = index;
+    }
+}
+
+function closeViewer(index) {
+    const viewer = document.getElementById('viewer-' + index);
+    const frame = document.getElementById('frame-' + index);
+    
+    if (viewer && frame) {
+        viewer.style.display = 'none';
+        frame.src = '';
+        
+        if (currentOpenViewer === index) {
+            currentOpenViewer = null;
+        }
+    }
+}
+
+function toggleEditResource(resourceId) {
+    const displayRow = document.getElementById('display-row-' + resourceId);
+    const editRow = document.getElementById('edit-row-' + resourceId);
+    
+    if (displayRow && editRow) {
+        if (displayRow.style.display === 'none') {
+            displayRow.style.display = 'table-row';
+            editRow.style.display = 'none';
+        } else {
+            displayRow.style.display = 'none';
+            editRow.style.display = 'table-row';
+        }
+    }
+}
+</script>
+{% endblock %}

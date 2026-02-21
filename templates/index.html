@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Browse Clusters - Learning Sequence Manager{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="mb-2">
+        <span>DATABASE: LEARNING_SEQUENCES</span>
+    </div>
+
+    <ul class="nav nav-tabs mb-2" id="yearTabs" role="tablist">
+        {% for year in year_levels %}
+        <li class="nav-item" role="presentation">
+            <button class="nav-link {% if loop.first %}active{% endif %}" 
+                    id="tab-{{ year.code }}" 
+                    data-bs-toggle="tab" 
+                    data-bs-target="#content-{{ year.code }}" 
+                    type="button" 
+                    role="tab">
+                {{ year.name }}
+            </button>
+        </li>
+        {% endfor %}
+    </ul>
+
+    <div class="tab-content" id="yearTabsContent">
+        {% for year_code, year_data in clusters_by_year.items() %}
+        <div class="tab-pane fade {% if loop.first %}show active{% endif %}" 
+             id="content-{{ year_code }}" 
+             role="tabpanel">
+            
+            <div class="mb-2">TABLE: CLUSTERS ({{ year_data.name }})</div>
+            
+            {% if year_data.clusters %}
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 60px;">ID</th>
+                        <th style="width: 300px; max-width: 300px;">TITLE</th>
+                        <th style="width: 150px;">STRAND</th>
+                        <th style="width: 120px;">VC_CODES</th>
+                        <th style="width: 80px;">STATUS</th>
+                        <th style="width: 70px;">ELEMENTS</th>
+                        <th style="width: 80px;">ACTIONS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cluster in year_data.clusters %}
+                    {% if not loop.first %}
+                    <tr class="cluster-separator"><td colspan="7" style="height: 3px; padding: 0; border: none; background-color: #888888;"></td></tr>
+                    {% endif %}
+                    <tr class="cluster-row">
+                        <td style="width: 60px;">{{ cluster.cluster_number }}</td>
+                        <td style="width: 300px; max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ cluster.title }}">{{ cluster.title }}</td>
+                        <td style="width: 150px;">{{ cluster.strand_name }}</td>
+                        <td style="width: 120px;">{{ cluster.vc_codes or '-' }}</td>
+                        <td style="width: 80px;">{{ 'PUBLISHED' if cluster.is_published else 'DRAFT' }}</td>
+                        <td style="width: 70px;">{{ cluster.elements|length }}</td>
+                        <td style="width: 80px;"><a href="{{ url_for('cluster_detail', cluster_id=cluster.id) }}">[EDIT]</a></td>
+                    </tr>
+                    {% if cluster.elements %}
+                    <tr>
+                        <td colspan="7" style="padding: 1rem 2rem; background-color: #f5f5f5; border-left: 4px solid #999999;">
+                            <div style="margin-bottom: 0.5rem; font-weight: bold; color: #666666;">↳ RELATED TABLE: ELEMENTS</div>
+                            <table style="width: 100%; margin-bottom: 0; border: 2px solid #999999;">
+                                <thead>
+                                    <tr style="background-color: #777777;">
+                                        <th style="background-color: #777777; width: 50px;">SEQ</th>
+                                        <th style="background-color: #777777; width: 90px;">ELEMENT_ID</th>
+                                        <th style="background-color: #777777; width: 250px; max-width: 250px;">TITLE</th>
+                                        <th style="background-color: #777777; width: 100px;">CPA</th>
+                                        <th style="background-color: #777777; width: 80px;">LOAD</th>
+                                        <th style="background-color: #777777; width: 80px;">STABILITY</th>
+                                        <th style="background-color: #777777; width: 90px;">RESOURCES</th>
+                                        <th style="background-color: #777777; width: 80px;">ACTIONS</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for element in cluster.elements %}
+                                    <tr style="background-color: #ffffff;">
+                                        <td style="border-color: #aaaaaa; width: 50px;">{{ loop.index }}</td>
+                                        <td style="border-color: #aaaaaa; width: 90px;">{{ element.element_number }}</td>
+                                        <td style="border-color: #aaaaaa; width: 250px; max-width: 250px; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ element.title }}">{{ element.title }}</td>
+                                        <td style="border-color: #aaaaaa; width: 100px;">{{ element.cpa_name or '-' }}</td>
+                                        <td style="border-color: #aaaaaa; width: 80px;">{{ element.load_name or '-' }}</td>
+                                        <td style="border-color: #aaaaaa; width: 80px;">{{ element.stability_name or '-' }}</td>
+                                        <td style="border-color: #aaaaaa; width: 90px;">{{ element.resource_count }}</td>
+                                        <td style="border-color: #aaaaaa; width: 80px;"><a href="{{ url_for('element_detail', element_id=element.id) }}">[EDIT]</a></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <div style="padding: 1rem; border: 1px solid #000000;">NO RECORDS FOUND</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
