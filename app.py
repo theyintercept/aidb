@@ -864,7 +864,9 @@ def api_cluster_detail(cluster_number):
 
 @app.route('/api/resource/<int:resource_id>/download')
 def api_resource_download(resource_id):
-    """Public download for a resource (for website links)"""
+    """Public download/view for a resource (for website links).
+    PDFs and images are served inline so browsers preview them directly.
+    All other formats (DOCX, PPTX, etc.) are served as attachments."""
     resource = query_db('''
         SELECT r.*, ff.stored_in_db
         FROM resources r
@@ -874,11 +876,15 @@ def api_resource_download(resource_id):
     if not resource:
         return jsonify({'error': 'Resource not found'}), 404
 
+    mime = resource['mime_type'] or 'application/octet-stream'
+    inline_types = {'application/pdf', 'image/png', 'image/jpeg', 'image/gif', 'image/webp'}
+    as_attachment = mime not in inline_types
+
     if resource['stored_in_db'] and resource['file_data']:
         return send_file(
             io.BytesIO(resource['file_data']),
-            mimetype=resource['mime_type'] or 'application/octet-stream',
-            as_attachment=True,
+            mimetype=mime,
+            as_attachment=as_attachment,
             download_name=resource['file_name'] or 'download'
         )
     if resource['file_path']:
@@ -886,8 +892,8 @@ def api_resource_download(resource_id):
         if os.path.exists(file_path):
             return send_file(
                 file_path,
-                mimetype=resource['mime_type'] or 'application/octet-stream',
-                as_attachment=True,
+                mimetype=mime,
+                as_attachment=as_attachment,
                 download_name=resource['file_name'] or 'download'
             )
     return jsonify({'error': 'File not found'}), 404
