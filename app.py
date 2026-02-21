@@ -945,6 +945,52 @@ def cluster_resource_view(resource_id):
         return redirect(url_for('cluster_detail', cluster_id=resource['cluster_id']))
 
 # ============================================================
+# DATABASE SEEDING (one-time setup — remove after use)
+# ============================================================
+
+@app.route('/admin/seed-database', methods=['GET', 'POST'])
+def seed_database():
+    """Download database from a URL into the persistent volume.
+    Protected by admin credentials. Remove this route after first use."""
+    import urllib.request
+
+    # Require admin credentials via query string
+    key = request.args.get('key', '')
+    expected = os.getenv('ADMIN_PASSWORD', '')
+    if not key or key != expected:
+        return jsonify({'error': 'Unauthorized'}), 401
+
+    db_path = app.config['DATABASE']
+
+    if request.method == 'GET':
+        exists = os.path.exists(db_path)
+        size = os.path.getsize(db_path) if exists else 0
+        return jsonify({
+            'database_path': db_path,
+            'exists': exists,
+            'size_bytes': size,
+            'usage': 'POST with JSON {"url": "https://..."} to download database'
+        })
+
+    data = request.get_json(silent=True) or {}
+    url = data.get('url', '').strip()
+    if not url:
+        return jsonify({'error': 'Provide {"url": "https://..."} in request body'}), 400
+
+    # Ensure target directory exists
+    os.makedirs(os.path.dirname(db_path) if os.path.dirname(db_path) else '.', exist_ok=True)
+
+    try:
+        tmp_path = db_path + '.tmp'
+        urllib.request.urlretrieve(url, tmp_path)
+        os.replace(tmp_path, db_path)
+        size = os.path.getsize(db_path)
+        return jsonify({'status': 'ok', 'database_path': db_path, 'size_bytes': size})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================
 # RUN
 # ============================================================
 
