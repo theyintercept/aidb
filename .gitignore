@@ -18,7 +18,7 @@ uploads/
 
 # Logs
 *.log
-*.txt
+!requirements.txt
 audit_report.txt
 import_log.txt
 import_references_log.txt
