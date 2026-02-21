@@ -978,15 +978,31 @@ def seed_database():
         return jsonify({'error': 'Provide {"url": "https://..."} in request body'}), 400
 
     # Ensure target directory exists
-    os.makedirs(os.path.dirname(db_path) if os.path.dirname(db_path) else '.', exist_ok=True)
+    target_dir = os.path.dirname(db_path)
+    if target_dir:
+        os.makedirs(target_dir, exist_ok=True)
+
+    tmp_path = db_path + '.tmp'
+
+    # Clean up any partial files from previous failed attempts
+    for f in [tmp_path, db_path]:
+        try:
+            if os.path.exists(f):
+                os.remove(f)
+        except Exception:
+            pass
 
     try:
-        tmp_path = db_path + '.tmp'
         urllib.request.urlretrieve(url, tmp_path)
         os.replace(tmp_path, db_path)
         size = os.path.getsize(db_path)
         return jsonify({'status': 'ok', 'database_path': db_path, 'size_bytes': size})
     except Exception as e:
+        # Clean up temp file on failure
+        try:
+            os.remove(tmp_path)
+        except Exception:
+            pass
         return jsonify({'error': str(e)}), 500
 
 
