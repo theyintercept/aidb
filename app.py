@@ -1031,19 +1031,17 @@ def seed_database():
     db_path = app.config['DATABASE']
 
     if request.method == 'GET':
-        # If ?format=html, show upload form
-        if request.args.get('format') == 'html':
-            exists = os.path.exists(db_path)
-            size = os.path.getsize(db_path) if exists else 0
-            return render_template('upload_database.html', exists=exists, size=size, key=key)
         exists = os.path.exists(db_path)
         size = os.path.getsize(db_path) if exists else 0
-        return jsonify({
-            'database_path': db_path,
-            'exists': exists,
-            'size_bytes': size,
-            'usage': 'POST with file= (multipart) or JSON {"url": "https://..."}. Add ?format=html for upload form.'
-        })
+        # Return JSON only if explicitly requested
+        if request.args.get('format') == 'json':
+            return jsonify({
+                'database_path': db_path,
+                'exists': exists,
+                'size_bytes': size,
+                'usage': 'POST with file= (multipart) or JSON {"url": "https://..."}'
+            })
+        return render_template('upload_database.html', exists=exists, size=size, key=key)
 
     target_dir = os.path.dirname(db_path)
     if target_dir:
