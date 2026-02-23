@@ -1,0 +1,292 @@
+================================================================================
+REFERENCE MATERIALS EXTRACTOR
+================================================================================
+
+Found 50 reference files:
+
+  READING: 39 files
+  PODCAST: 7 files
+  RESEARCH: 3 files
+  ARTICLE: 1 files
+
+================================================================================
+REFERENCE FILES BY TYPE
+================================================================================
+
+
+================================================================================
+READING MATERIALS (39 files)
+================================================================================
+
+📄 Typical progression cardinality and counting (NCETM)(1)
+   Location: Cluster 101 - Counting & cardinality to 5
+   File: READING_ Typical progression cardinality and counting (NCETM)(1).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Typical progression cardinality and counting (NCETM)
+   Location: Cluster 101 - Counting & cardinality to 5
+   File: READING_ Typical progression cardinality and counting (NCETM).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 How best to teach the cardinality principle_
+   Location: Cluster 101 - Counting & cardinality to 5
+   File: READING_ How best to teach the cardinality principle_.docx
+   Suggest: Add to Cluster Rationale
+
+📄 Zero
+   Location: Cluster 101 - Counting & cardinality to 5
+   File: READING_ Zero.png
+   Suggest: Add to Cluster Rationale
+
+📄 COMPARISION Typical EY Progression Chart (NCETM)
+   Location: Cluster 101 - Counting & cardinality to 5
+   File: READING_ COMPARISION Typical EY Progression Chart (NCETM).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Typical progression part part whole (NCETM)
+   Location: Cluster 108 - Part part whole combining to 10
+   File: Reading_ Typical progression part part whole (NCETM).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Sharing scenarios facilitate division performance in preschoolers (Hamamouche-Chernyak-Cordes-2020)
+   Location: Cluster 111 - Share group to 10
+   File: READING_ Sharing scenarios facilitate division performance in preschoolers (Hamamouche-Chernyak-Cordes-2020).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Sharing and grouping variation
+   Location: Cluster 111 - Share group to 10
+   File: READING_ Sharing and grouping variation.docx
+   Suggest: Add to Cluster Rationale
+
+📄 Copy of READING_ COMPARISION Typical EY Progression Chart (NCETM)
+   Location: Cluster 112 - The numbers 0 to 20
+   File: Copy of READING_ COMPARISION Typical EY Progression Chart (NCETM).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Typical progression pattern (NCETM)
+   Location: Cluster 120 - Patterns
+   File: READING_ Typical progression pattern (NCETM).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Typical progression measuring (NCETM)
+   Location: Cluster 121 - Measurement attributes
+   File: READING_ Typical progression measuring (NCETM).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Typical progression shape & space (NCETM)
+   Location: Cluster 123 - Familiar shapes
+   File: READING_ Typical progression shape & space (NCETM).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Typical progression shape & space (NCETM)
+   Location: Cluster 124 - Position & location
+   File: READING_ Typical progression shape & space (NCETM).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Number sense on the number line (Woods et al)
+   Location: Cluster 204 - Number line introduction
+   File: READING_ Number sense on the number line (Woods et al).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Number lines with whole numbers (DEECD)
+   Location: Cluster 205 - Number line add subtract
+   File: READING_ Number lines with whole numbers (DEECD).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Using the number line to develop understanding Sutherland et al (Sage journals)
+   Location: Cluster 205 - Number line add subtract
+   File: READING_ Using the number line to develop understanding Sutherland et al (Sage journals).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Basic Facts Addition Milestones (Dr Paul Swan)
+   Location: Cluster 209 - Single digit facts
+   File: READING_ Basic Facts Addition Milestones (Dr Paul Swan).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Unitising (Diane Siemon)
+   Location: Cluster 210 - Tens & ones concept
+   File: READING_ Unitising (Diane Siemon).png
+   Suggest: Add to Cluster Rationale
+
+📄 Best advice place value (Magill school SA)
+   Location: Cluster 210 - Tens & ones concept
+   File: READING_ Best advice place value (Magill school SA).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Lots and Groups misconception (thirdspacelearning)
+   Location: Cluster 210 - Tens & ones concept
+   File: READING_ Lots and Groups misconception (thirdspacelearning).docx
+   Suggest: Add to Cluster Rationale
+
+📄 Mathematical Modelling (Vinculum)
+   Location: Cluster 214 - Equivalence
+   File: READING_ Mathematical Modelling (Vinculum).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Mathematical Modelling (Vinculum)
+   Location: Cluster 215 - Additive problems
+   File: READING_ Mathematical Modelling (Vinculum).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Difficulties with division (Jenni Black)
+   Location: Cluster 216 - Grouping
+   File: READING_ Difficulties with division (Jenni Black).docx
+   Suggest: Add to Cluster Rationale
+
+📄 Repeating patterns (AJEC)
+   Location: Cluster 219 - Skip counting patterns
+   File: READING_ Repeating patterns (AJEC).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Typical progression pattern (NCETM)
+   Location: Cluster 219 - Skip counting patterns
+   File: READING_ Typical progression pattern (NCETM).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Teaching measurement Early stage 1 (NSW Government)
+   Location: Cluster 221 - Measurement
+   File: READING_ Teaching measurement Early stage 1 (NSW Government).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Copy of READING_ Typical progression measuring (NCETM)
+   Location: Cluster 221 - Measurement
+   File: Copy of READING_ Typical progression measuring (NCETM).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Components of place value understanding_ Targeting mathematical (Beth L MacDonald doi
+   Location: Cluster 302 - Counting to 1000
+   File: READING_ Components of place value understanding_ Targeting mathematical (Beth L MacDonald doi.org)
+   Suggest: Add to Cluster Rationale
+
+📄 Teaching Place Value (Dr Ange Rogers)
+   Location: Cluster 304 - Hundreds concept
+   File: READING_ Teaching Place Value (Dr Ange Rogers).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Queensland Students’ Understanding of Fractions- Evidence from the NAPLAN test results
+   Location: Cluster 306 - Fraction halves
+   File: READING_ Queensland Students’ Understanding of Fractions- Evidence from the NAPLAN test results.pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Teaching fractions for understanding- Addressing interrelated concepts
+   Location: Cluster 306 - Fraction halves
+   File: READING_ Teaching fractions for understanding- Addressing interrelated concepts.pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Number line unidimensionality is a critical feature for promoting fraction magnitude concepts
+   Location: Cluster 307 - Fraction quarters & eighths
+   File: READING_ Number line unidimensionality is a critical feature for promoting fraction magnitude concepts.docx
+   Suggest: Add to Cluster Rationale
+
+📄 Number families and relationships (New Zealand Curriculum)
+   Location: Cluster 308 - Add subtract fact families
+   File: READING_ Number families and relationships (New Zealand Curriculum).docx
+   Suggest: Add to Cluster Rationale
+
+📄 Copy of READING_ Basic Facts Addition Milestones (Dr Paul Swan)
+   Location: Cluster 309 - Facts to 20
+   File: Copy of READING_ Basic Facts Addition Milestones (Dr Paul Swan).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Copy of READING_ Using arrays (Jacob, Mulligan APMC)
+   Location: Cluster 312 - Multiplication
+   File: Copy of READING_ Using arrays (Jacob, Mulligan APMC).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Copy of READING_ Multiplicative thinking PD (Di Siemens)
+   Location: Cluster 312 - Multiplication
+   File: Copy of READING_ Multiplicative thinking PD (Di Siemens).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Copy of READING_ Childrens difficulties with division an intervention study (Laurert et al)
+   Location: Cluster 313 - Division
+   File: Copy of READING_ Childrens difficulties with division an intervention study (Laurert et al).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Copy of READING_ Equal grouping and sharing (Maths no problem!)
+   Location: Cluster 313 - Division
+   File: Copy of READING_ Equal grouping and sharing (Maths no problem!).docx
+   Suggest: Add to Cluster Rationale
+
+📄 Copy of READING_ Mathematical Modelling In The Victorian Curriculum (Prime Number)
+   Location: Cluster 316 - Four operations problems
+   File: Copy of READING_ Mathematical Modelling In The Victorian Curriculum (Prime Number).pdf
+   Suggest: Add to Cluster Rationale
+
+
+
+================================================================================
+PODCAST MATERIALS (7 files)
+================================================================================
+
+📄 Children’s early understanding of number with Francesco Sella (Mr Barton)
+   Location: Cluster 101 - Counting & cardinality to 5
+   File: PODCAST_ Children’s early understanding of number with Francesco Sella (Mr Barton).mp3
+   Suggest: Add to Cluster Rationale
+
+📄 Why early maths matters (Making math matter)
+   Location: Cluster 101 - Counting & cardinality to 5
+   File: PODCAST_ Why early maths matters (Making math matter).docx
+   Suggest: Add to Cluster Rationale
+
+📄 How to teach division that leads to algebra (Making math matter)
+   Location: Cluster 111 - Share group to 10
+   File: PODCAST_ How to teach division that leads to algebra (Making math matter).docx
+   Suggest: Add to Cluster Rationale
+
+📄 The Promise of Counting Collections (Rounding Up)
+   Location: Cluster 207 - Counting to 100
+   File: PODCAST_ The Promise of Counting Collections (Rounding Up).docx
+   Suggest: Add to Cluster Rationale
+
+📄 Making sense of unitising (Rounding Up)
+   Location: Cluster 210 - Tens & ones concept
+   File: PODCAST_ Making sense of unitising (Rounding Up).docx
+   Suggest: Add to Cluster Rationale
+
+📄 Teaching division with the remainders in the early years (Build Maths Minds)
+   Location: Cluster 216 - Grouping
+   File: PODCAST_ Teaching division with the remainders in the early years (Build Maths Minds).docx
+   Suggest: Add to Cluster Rationale
+
+📄 Rethinking how we teach and learn fractions (Make math moments)
+   Location: Cluster 307 - Fraction quarters & eighths
+   File: PODCAST_ Rethinking how we teach and learn fractions (Make math moments).docx
+   Suggest: Add to Cluster Rationale
+
+
+
+================================================================================
+RESEARCH MATERIALS (3 files)
+================================================================================
+
+📄 Developing estimation (Andrew Gael
+   Location: Cluster 208 - Estimating within 100
+   File: RESEARCH_ Developing estimation (Andrew Gael.com)
+   Suggest: Add to Cluster Rationale
+
+📄 The development of place value concepts_ Approximation before principles (nihms-1779548)
+   Location: Cluster 210 - Tens & ones concept
+   File: RESEARCH_ The development of place value concepts_ Approximation before principles (nihms-1779548).pdf
+   Suggest: Add to Cluster Rationale
+
+📄 Developing early Place Value Understanding_ A Framework for Tens Awareness (Opening Up Mathematics Education Research ED572346)
+   Location: Cluster 210 - Tens & ones concept
+   File: RESEARCH_ Developing early Place Value Understanding_ A Framework for Tens Awareness (Opening Up Mathematics Education Research ED572346).pdf
+   Suggest: Add to Cluster Rationale
+
+
+
+================================================================================
+ARTICLE MATERIALS (1 files)
+================================================================================
+
+📄 Mathematics Developmental Continuum (Smart Vic Teacher)
+   Location: Cluster 214 - Equivalence
+   File: ARTICLE_ Mathematics Developmental Continuum (Smart Vic Teacher).docx
+   Suggest: Add to Cluster Rationale
+
+
+================================================================================
+✅ Complete list exported to: reference_materials.csv
+================================================================================

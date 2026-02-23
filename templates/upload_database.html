@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Database - AIDB</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light p-4">
+    <div class="container" style="max-width: 500px;">
+        <h4 class="mb-3">Upload Database to Railway</h4>
+        {% if exists %}
+        <p class="text-muted">Current database: {{ (size / 1024 / 1024)|round(1) }} MB</p>
+        {% endif %}
+        <form action="/admin/seed-database?key={{ key }}" method="post" enctype="multipart/form-data" id="uploadForm">
+            <div class="mb-3">
+                <label for="file" class="form-label">Select learning_sequence_v2.db</label>
+                <input type="file" class="form-control" name="file" id="file" accept=".db" required>
+            </div>
+            <button type="submit" class="btn btn-primary" id="submitBtn">Upload</button>
+        </form>
+        <p class="text-muted small mt-3">Large files (1–2 GB) may take several minutes. Do not close this page.</p>
+        <div id="progress" class="mt-2" style="display: none;">
+            <div class="progress">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+            </div>
+            <p class="small mt-1">Uploading...</p>
+        </div>
+        <div id="result" class="mt-2" style="display: none;"></div>
+    </div>
+    <script>
+        document.getElementById('uploadForm').onsubmit = function() {
+            document.getElementById('submitBtn').disabled = true;
+            document.getElementById('progress').style.display = 'block';
+        };
+    </script>
+</body>
+</html>

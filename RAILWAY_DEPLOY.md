@@ -61,17 +61,20 @@ The database file must survive redeploys. Railway Volumes provide persistent dis
 
 ## Step 5 — Upload your database to the Volume
 
-The database lives on your Mac and needs to be copied to Railway's volume.
+**Option A: Built-in upload (recommended)**
 
-```bash
-cd /Users/bridgethorton/AIDB
+1. Ensure the volume is attached to AIDB at `/data` (not Filebrowser).
+2. Deploy AIDB, then visit:
+   ```
+   https://YOUR-AIDB-URL/admin/seed-database?key=YOUR_ADMIN_PASSWORD&format=html
+   ```
+3. Upload `learning_sequence_v2.db` using the form. Large files may take several minutes.
 
-# Link to your Railway project
-railway link
+**Option B: Filebrowser** (if upload fails)
 
-# Copy the database to the volume
-railway volume cp learning_sequence_v2.db /data/learning_sequence_v2.db
-```
+1. Deploy the Filebrowser template, set `USE_VOLUME_ROOT` = `1`
+2. Detach volume from AIDB, attach to Filebrowser at `/data`
+3. Upload via Filebrowser web UI, then detach and reattach to AIDB
 
 ---
 
@@ -124,10 +127,7 @@ git push
 ```
 Railway automatically redeploys within ~30 seconds.
 
-If you've added new data to the database on your Mac:
-```bash
-railway volume cp learning_sequence_v2.db /data/learning_sequence_v2.db
-```
+If you've added new data to the database on your Mac, repeat the Filebrowser upload steps above (Steps 5–10) to replace the database on the volume.
 
 ---
 

@@ -18,6 +18,7 @@ app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 app.config['DATABASE'] = os.getenv('DATABASE_PATH', 'learning_sequence_v2.db')
 app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
+DB_UPLOAD_MAX = 3 * 1024 * 1024 * 1024  # 3GB for database upload
 
 # URL signer for temporary public file access (expires in 1 hour)
 url_serializer = URLSafeTimedSerializer(app.secret_key)
@@ -717,7 +718,8 @@ def api_root():
             'year_levels': f'{base}/api/year-levels',
             'clusters': f'{base}/api/clusters?year=F|Y1|Y2',
             'cluster_detail': f'{base}/api/cluster/<cluster_number>',
-            'resource_download': f'{base}/api/resource/<id>/download'
+            'resource_download': f'{base}/api/resource/<id>/download',
+            'stats': f'{base}/api/stats'
         }
     })
 
@@ -730,6 +732,42 @@ def api_year_levels():
     """List year levels (F, Y1, Y2, etc.)"""
     rows = query_db('SELECT id, code, name, display_order FROM year_levels ORDER BY display_order')
     return jsonify([_row_to_dict(r) for r in rows])
+
+@app.route('/api/stats')
+def api_stats():
+    """Database stats: resource count, total file size, breakdown by format"""
+    total = query_db('''
+        SELECT COUNT(*) as count,
+               COALESCE(SUM(CASE WHEN file_data IS NOT NULL AND length(file_data) > 0 THEN file_size_bytes ELSE 0 END), 0) as blob_bytes,
+               COALESCE(SUM(CASE WHEN file_path IS NOT NULL AND length(file_path) > 0 THEN file_size_bytes ELSE 0 END), 0) as filesystem_bytes
+        FROM resources
+    ''', one=True)
+    by_format = query_db('''
+        SELECT ff.code as format_code,
+               COUNT(r.id) as count,
+               COALESCE(SUM(CASE WHEN r.file_data IS NOT NULL AND length(r.file_data) > 0 THEN r.file_size_bytes ELSE 0 END), 0) as blob_bytes
+        FROM resources r
+        JOIN file_formats ff ON r.file_format_id = ff.id
+        GROUP BY ff.code
+        ORDER BY count DESC
+    ''')
+    blob_mb = (total['blob_bytes'] or 0) / (1024 * 1024)
+    fs_mb = (total['filesystem_bytes'] or 0) / (1024 * 1024)
+    return jsonify({
+        'resource_count': total['count'] or 0,
+        'total_blob_bytes': total['blob_bytes'] or 0,
+        'total_blob_mb': round(blob_mb, 2),
+        'total_filesystem_bytes': total['filesystem_bytes'] or 0,
+        'total_filesystem_mb': round(fs_mb, 2),
+        'by_format': [
+            {
+                'format': r['format_code'],
+                'count': r['count'],
+                'blob_mb': round((r['blob_bytes'] or 0) / (1024 * 1024), 2)
+            }
+            for r in by_format
+        ]
+    })
 
 @app.route('/api/clusters')
 def api_clusters():
@@ -880,14 +918,16 @@ def api_resource_download(resource_id):
     inline_types = {'application/pdf', 'image/png', 'image/jpeg', 'image/gif', 'image/webp'}
     as_attachment = mime not in inline_types
 
-    if resource['stored_in_db'] and resource['file_data']:
+    # Prefer file_data (BLOB) — required for Railway; works for all formats including PPTX
+    if resource.get('file_data'):
         return send_file(
             io.BytesIO(resource['file_data']),
             mimetype=mime,
             as_attachment=as_attachment,
             download_name=resource['file_name'] or 'download'
         )
-    if resource['file_path']:
+    # Fallback: file_path (filesystem) — only works locally, not on Railway
+    if resource.get('file_path'):
         file_path = resource['file_path'] if resource['file_path'].startswith('uploads') else os.path.join(app.config['UPLOAD_FOLDER'], resource['file_path'])
         if os.path.exists(file_path):
             return send_file(
@@ -896,7 +936,10 @@ def api_resource_download(resource_id):
                 as_attachment=as_attachment,
                 download_name=resource['file_name'] or 'download'
             )
-    return jsonify({'error': 'File not found'}), 404
+    return jsonify({
+        'error': 'File not found',
+        'detail': 'The file content is missing from the database. On Railway, files must be stored in the database (not on disk). Run migrate_to_blob.py locally to migrate Word/PPTX from file_path to file_data, then redeploy the database.'
+    }), 404
 
 # ============================================================
 # CLUSTER RESOURCES (REFERENCE MATERIALS)
@@ -951,16 +994,35 @@ def cluster_resource_view(resource_id):
         return redirect(url_for('cluster_detail', cluster_id=resource['cluster_id']))
 
 # ============================================================
-# DATABASE SEEDING (one-time setup — remove after use)
+# DATABASE SEEDING / UPLOAD (for Railway volume updates)
 # ============================================================
+
+_original_max_content = None
+
+@app.before_request
+def _allow_large_db_upload():
+    """Allow up to 3GB for database upload route"""
+    global _original_max_content
+    if request.path == '/admin/seed-database' and request.method == 'POST':
+        _original_max_content = app.config.get('MAX_CONTENT_LENGTH')
+        app.config['MAX_CONTENT_LENGTH'] = DB_UPLOAD_MAX
+
+@app.after_request
+def _reset_max_content(resp):
+    global _original_max_content
+    if _original_max_content is not None:
+        app.config['MAX_CONTENT_LENGTH'] = _original_max_content
+        _original_max_content = None
+    return resp
 
 @app.route('/admin/seed-database', methods=['GET', 'POST'])
 def seed_database():
-    """Download database from a URL into the persistent volume.
-    Protected by admin credentials. Remove this route after first use."""
+    """Upload database file or download from URL. Protected by admin password.
+    Use ?key=YOUR_ADMIN_PASSWORD for auth. Supports:
+    - POST multipart: file field with .db file
+    - POST JSON: {"url": "https://..."} to download from URL"""
     import urllib.request
 
-    # Require admin credentials via query string
     key = request.args.get('key', '')
     expected = os.getenv('ADMIN_PASSWORD', '')
     if not key or key != expected:
@@ -969,28 +1031,51 @@ def seed_database():
     db_path = app.config['DATABASE']
 
     if request.method == 'GET':
+        # If ?format=html, show upload form
+        if request.args.get('format') == 'html':
+            exists = os.path.exists(db_path)
+            size = os.path.getsize(db_path) if exists else 0
+            return render_template('upload_database.html', exists=exists, size=size, key=key)
         exists = os.path.exists(db_path)
         size = os.path.getsize(db_path) if exists else 0
         return jsonify({
             'database_path': db_path,
             'exists': exists,
             'size_bytes': size,
-            'usage': 'POST with JSON {"url": "https://..."} to download database'
+            'usage': 'POST with file= (multipart) or JSON {"url": "https://..."}. Add ?format=html for upload form.'
         })
 
-    data = request.get_json(silent=True) or {}
-    url = data.get('url', '').strip()
-    if not url:
-        return jsonify({'error': 'Provide {"url": "https://..."} in request body'}), 400
-
-    # Ensure target directory exists
     target_dir = os.path.dirname(db_path)
     if target_dir:
         os.makedirs(target_dir, exist_ok=True)
-
     tmp_path = db_path + '.tmp'
 
-    # Clean up any partial files from previous failed attempts
+    # Option 1: Direct file upload (multipart)
+    if 'file' in request.files:
+        f = request.files['file']
+        if f.filename and f.filename.lower().endswith('.db'):
+            try:
+                f.save(tmp_path)
+                os.replace(tmp_path, db_path)
+                size = os.path.getsize(db_path)
+                # Return HTML for form submissions so user sees friendly message
+                if request.content_type and 'multipart' in request.content_type:
+                    return f'<html><body style="font-family:sans-serif;padding:2rem;"><h3>Upload complete</h3><p>Database updated: {size / 1024 / 1024:.1f} MB</p><p><a href="/">Back to AIDB</a></p></body></html>'
+                return jsonify({'status': 'ok', 'database_path': db_path, 'size_bytes': size})
+            except Exception as e:
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
+                return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'Upload a .db file'}), 400
+
+    # Option 2: Download from URL
+    data = request.get_json(silent=True) or {}
+    url = data.get('url', '').strip()
+    if not url:
+        return jsonify({'error': 'Provide file= (multipart) or {"url": "https://..."}'}), 400
+
     for f in [tmp_path, db_path]:
         try:
             if os.path.exists(f):
@@ -1004,7 +1089,6 @@ def seed_database():
         size = os.path.getsize(db_path)
         return jsonify({'status': 'ok', 'database_path': db_path, 'size_bytes': size})
     except Exception as e:
-        # Clean up temp file on failure
         try:
             os.remove(tmp_path)
         except Exception:

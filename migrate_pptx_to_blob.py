@@ -1,44 +1,38 @@
 #!/usr/bin/env python3
 """
-Migrate compressed Word documents under 5MB from filesystem to BLOB storage
+Migrate PPTX files under 10MB from filesystem to BLOB storage for Railway compatibility
 """
 
 import os
 import sqlite3
 
 DATABASE = "learning_sequence_v2.db"
-UPLOADS_FOLDER = "uploads"
-# 20MB for Word docs — Railway needs them in DB; larger than original 5MB import threshold
-WORD_BLOB_THRESHOLD = 20 * 1024 * 1024
+PPTX_LIMIT = 10 * 1024 * 1024  # 10MB
 
-def get_file_size(filepath):
-    """Get file size in bytes"""
-    return os.path.getsize(filepath)
-
-def migrate_to_blob():
+def migrate_pptx_to_blob():
     print("=" * 80)
-    print("MIGRATING WORD DOCUMENTS TO BLOB STORAGE (for Railway)")
+    print("MIGRATING PPTX FILES TO BLOB STORAGE (for Railway)")
     print("=" * 80)
     print()
     
     db = sqlite3.connect(DATABASE)
     db.row_factory = sqlite3.Row
     
-    # Find Word docs in filesystem (under 20MB for Railway compatibility)
     cursor = db.execute('''
-        SELECT id, file_name, file_path, file_size_bytes, title
-        FROM resources 
-        WHERE mime_type LIKE '%word%' 
-          AND file_path IS NOT NULL 
-          AND file_path != ''
+        SELECT r.id, r.file_name, r.file_path, r.file_size_bytes, r.title
+        FROM resources r
+        JOIN file_formats ff ON r.file_format_id = ff.id
+        WHERE ff.code = 'PPTX'
+          AND r.file_path IS NOT NULL AND r.file_path != ''
+          AND (r.file_data IS NULL OR length(r.file_data) = 0)
     ''')
     
     candidates = []
     for row in cursor:
         filepath = row['file_path']
         if os.path.exists(filepath):
-            current_size = get_file_size(filepath)
-            if current_size <= WORD_BLOB_THRESHOLD:
+            current_size = os.path.getsize(filepath)
+            if current_size <= PPTX_LIMIT:
                 candidates.append({
                     'id': row['id'],
                     'file_name': row['file_name'],
@@ -48,28 +42,24 @@ def migrate_to_blob():
                     'title': row['title']
                 })
     
-    print(f"✓ Found {len(candidates)} Word documents (≤20MB) to migrate")
+    print(f"✓ Found {len(candidates)} PPTX files under 10MB to migrate")
     print()
     
     if not candidates:
-        print("No files to migrate!")
+        print("No PPTX files to migrate!")
         db.close()
         return
     
     migrated = 0
-    freed_space = 0
-    
     for idx, doc in enumerate(candidates, 1):
         print(f"[{idx}/{len(candidates)}] Migrating: {doc['file_name']}")
         print(f"    Title: {doc['title'][:60]}")
         print(f"    Size: {doc['new_size'] / 1024 / 1024:.2f} MB")
         
         try:
-            # Read file content
             with open(doc['file_path'], 'rb') as f:
                 file_data = f.read()
             
-            # Update database - move to BLOB storage
             db.execute('''
                 UPDATE resources 
                 SET file_data = ?,
@@ -79,33 +69,21 @@ def migrate_to_blob():
             ''', (file_data, doc['new_size'], doc['id']))
             
             db.commit()
-            
-            # Delete file from uploads folder
             os.remove(doc['file_path'])
-            
-            print(f"    ✅ Migrated to BLOB and removed from filesystem")
-            print()
-            
+            print(f"    ✅ Migrated to BLOB")
             migrated += 1
-            freed_space += doc['new_size']
-            
         except Exception as e:
             print(f"    ❌ Error: {e}")
-            print()
             db.rollback()
+        print()
     
     db.close()
     
     print("=" * 80)
     print("MIGRATION COMPLETE")
     print("=" * 80)
-    print(f"✅ Migrated {migrated} documents to BLOB storage")
-    print(f"✅ Removed {migrated} files from filesystem")
-    print(f"✅ Reduced filesystem usage by {freed_space / 1024 / 1024:.2f} MB")
-    print(f"✅ Database BLOBs increased by {freed_space / 1024 / 1024:.2f} MB")
+    print(f"✅ Migrated {migrated} PPTX files to BLOB storage")
     print()
-    if len(candidates) > migrated:
-        print(f"⚠️  {len(candidates) - migrated} Word docs skipped (over 20MB)")
 
 if __name__ == '__main__':
-    migrate_to_blob()
+    migrate_pptx_to_blob()

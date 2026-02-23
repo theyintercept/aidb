@@ -253,8 +253,10 @@ def main():
                         file_format_id = get_file_format_id(extension)
                         mime_type = get_mime_type(extension)
                         
-                        # Store small files as BLOB, large files in filesystem
-                        if file_size <= BLOB_THRESHOLD and extension != '.pptx':
+                        # Store in DB (BLOB) for Railway compatibility. PPTX under 10MB also stored in DB.
+                        pptx_limit = 10 * 1024 * 1024  # 10MB for PPTX
+                        use_blob = (file_size <= BLOB_THRESHOLD) or (extension == '.pptx' and file_size <= pptx_limit)
+                        if use_blob:
                             # Store as BLOB
                             with open(file_path, 'rb') as f:
                                 file_data = f.read()
