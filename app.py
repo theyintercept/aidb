@@ -1083,9 +1083,20 @@ def seed_database():
             except Exception:
                 pass
         try:
-            urllib.request.urlretrieve(url, tmp_path)
+            req = urllib.request.Request(url, headers={
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+            })
+            with urllib.request.urlopen(req, timeout=1200) as resp:
+                with open(tmp_path, 'wb') as f:
+                    while True:
+                        chunk = resp.read(65536)
+                        if not chunk:
+                            break
+                        f.write(chunk)
             os.replace(tmp_path, db_path)
-        except Exception:
+            print(f'[seed-db] Download complete: {os.path.getsize(db_path)} bytes')
+        except Exception as e:
+            print(f'[seed-db] Download failed: {e}')
             try:
                 os.remove(tmp_path)
             except Exception:
@@ -1109,7 +1120,16 @@ def seed_database():
             pass
 
     try:
-        urllib.request.urlretrieve(url, tmp_path)
+        req = urllib.request.Request(url, headers={
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+        })
+        with urllib.request.urlopen(req, timeout=1200) as resp:
+            with open(tmp_path, 'wb') as f:
+                while True:
+                    chunk = resp.read(65536)
+                    if not chunk:
+                        break
+                    f.write(chunk)
         os.replace(tmp_path, db_path)
         size = os.path.getsize(db_path)
         return jsonify({'status': 'ok', 'database_path': db_path, 'size_bytes': size})
