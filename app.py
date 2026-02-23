@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import threading
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
 from flask_cors import CORS
@@ -919,7 +920,7 @@ def api_resource_download(resource_id):
     as_attachment = mime not in inline_types
 
     # Prefer file_data (BLOB) — required for Railway; works for all formats including PPTX
-    if resource.get('file_data'):
+    if resource['file_data']:
         return send_file(
             io.BytesIO(resource['file_data']),
             mimetype=mime,
@@ -927,7 +928,7 @@ def api_resource_download(resource_id):
             download_name=resource['file_name'] or 'download'
         )
     # Fallback: file_path (filesystem) — only works locally, not on Railway
-    if resource.get('file_path'):
+    if resource['file_path']:
         file_path = resource['file_path'] if resource['file_path'].startswith('uploads') else os.path.join(app.config['UPLOAD_FOLDER'], resource['file_path'])
         if os.path.exists(file_path):
             return send_file(
@@ -1073,6 +1074,32 @@ def seed_database():
     url = data.get('url', '').strip()
     if not url:
         return jsonify({'error': 'Provide file= (multipart) or {"url": "https://..."}'}), 400
+
+    def do_download():
+        for f in [tmp_path, db_path]:
+            try:
+                if os.path.exists(f):
+                    os.remove(f)
+            except Exception:
+                pass
+        try:
+            urllib.request.urlretrieve(url, tmp_path)
+            os.replace(tmp_path, db_path)
+        except Exception:
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+
+    if request.args.get('background') == '1':
+        # Run download in background to avoid 502 timeout
+        thread = threading.Thread(target=do_download)
+        thread.daemon = True
+        thread.start()
+        return jsonify({
+            'status': 'started',
+            'message': 'Download running in background. Check in 5–10 min. Use GET ?format=json to verify size.'
+        })
 
     for f in [tmp_path, db_path]:
         try:
