@@ -26,12 +26,15 @@ url_serializer = URLSafeTimedSerializer(app.secret_key)
 
 def _api_base_url():
     """Base URL for API responses (download_url etc). Use HTTPS on Railway."""
-    public = os.getenv('AIDB_PUBLIC_URL', '').rstrip('/')
+    public = os.getenv('AIDB_PUBLIC_URL', '').strip().rstrip('/')
     if public:
         return public
     base = request.url_root.rstrip('/')
-    if request.headers.get('X-Forwarded-Proto') == 'https' and base.startswith('http://'):
-        return 'https://' + base[7:]
+    if base.startswith('http://'):
+        if request.headers.get('X-Forwarded-Proto') == 'https':
+            return 'https://' + base[7:]
+        if 'railway.app' in (request.host or ''):
+            return 'https://' + base[7:]
     return base
 
 # Allowed file extensions
