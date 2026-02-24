@@ -24,6 +24,16 @@ DB_UPLOAD_MAX = 3 * 1024 * 1024 * 1024  # 3GB for database upload
 # URL signer for temporary public file access (expires in 1 hour)
 url_serializer = URLSafeTimedSerializer(app.secret_key)
 
+def _api_base_url():
+    """Base URL for API responses (download_url etc). Use HTTPS on Railway."""
+    public = os.getenv('AIDB_PUBLIC_URL', '').rstrip('/')
+    if public:
+        return public
+    base = request.url_root.rstrip('/')
+    if request.headers.get('X-Forwarded-Proto') == 'https' and base.startswith('http://'):
+        return 'https://' + base[7:]
+    return base
+
 # Allowed file extensions
 ALLOWED_EXTENSIONS = {
     'pdf': 'application/pdf',
@@ -826,7 +836,7 @@ def api_clusters():
                 WHERE r.element_id = ?
                 ORDER BY rc.display_order, r.title
             ''', [el['id']])
-            base_url = request.url_root.rstrip('/')
+            base_url = _api_base_url()
             el_dict['resources'] = [
                 {
                     'id': r['id'],
@@ -872,7 +882,7 @@ def api_cluster_detail(cluster_number):
         WHERE ce.cluster_id = ?
         ORDER BY ce.sequence_order
     ''', [cluster['id']])
-    base_url = request.url_root.rstrip('/')
+    base_url = _api_base_url()
     result['elements'] = []
     for el in elements:
         el_dict = _row_to_dict(el)

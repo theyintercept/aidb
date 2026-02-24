@@ -88,7 +88,8 @@ In Railway dashboard → your project → **Variables**, add:
 | `ADMIN_USERNAME` | Your chosen admin username |
 | `ADMIN_PASSWORD` | A strong password |
 | `DATABASE_PATH` | `/data/learning_sequence_v2.db` |
-| `CORS_ORIGINS` | `https://theyintercept.com.au,https://www.theyintercept.com.au,https://tool.theyintercept.com.au` |
+| `AIDB_PUBLIC_URL` | Your Railway AIDB URL with HTTPS (e.g. `https://aidb-production-1b69.up.railway.app`) — ensures download URLs use HTTPS |
+| `CORS_ORIGINS` | `https://theyintercept.com.au,https://www.theyintercept.com.au,https://tracker.theyintercept.com.au` |
 | `FLASK_ENV` | `production` |
 
 To generate a strong SECRET_KEY, run:
