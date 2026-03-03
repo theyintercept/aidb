@@ -2,27 +2,51 @@ import os
 import sqlite3
 import threading
 from functools import wraps
-from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify, send_file, send_from_directory
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 from itsdangerous import URLSafeTimedSerializer
 import io
+import re
+from urllib.parse import quote, unquote
 
-# Load environment variables
-load_dotenv()
+# Load environment variables (from app dir so .env is found when run via systemd/other cwd)
+_load_env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.env')
+load_dotenv(_load_env_path)
+if not os.path.isfile(_load_env_path):
+    load_dotenv()  # fallback: cwd
 
 app = Flask(__name__)
 CORS(app, origins=os.getenv('CORS_ORIGINS', '*').split(','))  # Restrict in production
 app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
 app.config['DATABASE'] = os.getenv('DATABASE_PATH', 'learning_sequence_v2.db')
-app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(__file__), 'uploads')
+# UPLOAD_FOLDER: use env, or put uploads next to the database (so Railway Volume holds both)
+app.config['UPLOAD_FOLDER'] = os.getenv('UPLOAD_FOLDER') or os.path.join(
+    os.path.dirname(os.path.abspath(app.config['DATABASE'])),
+    'uploads'
+)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB max file size
 DB_UPLOAD_MAX = 3 * 1024 * 1024 * 1024  # 3GB for database upload
 
 # URL signer for temporary public file access (expires in 1 hour)
 url_serializer = URLSafeTimedSerializer(app.secret_key)
+
+def _resolve_resource_file(resource):
+    """Return (file_obj_or_path, mimetype, download_name) for sending, or None if not found.
+    Prefers file_data (BLOB), falls back to file_path (filesystem)."""
+    if resource.get('file_data'):
+        return (io.BytesIO(resource['file_data']), resource.get('mime_type'), resource.get('file_name'))
+    if resource.get('file_path'):
+        fp = resource['file_path'].lstrip('/')
+        # file_path may be 'uuid_file.pdf' (flat) or '123/filename.pdf' (subdir from migration)
+        if '..' in fp or fp.startswith('/'):
+            return None
+        path = os.path.join(app.config['UPLOAD_FOLDER'], fp)
+        if os.path.exists(path):
+            return (path, resource.get('mime_type'), resource.get('file_name'))
+    return None
 
 def _api_base_url():
     """Base URL for API responses (download_url etc). Use HTTPS on Railway."""
@@ -100,6 +124,25 @@ def get_file_extension(filename):
 def get_mime_type(extension):
     """Get MIME type for file extension"""
     return ALLOWED_EXTENSIONS.get(extension.lower(), 'application/octet-stream')
+
+# Extension → format code for API (so website shows real type from file_url/filename, not default PDF)
+EXTENSION_TO_FORMAT = {
+    'pdf': 'PDF', 'doc': 'DOC', 'docx': 'DOCX', 'ppt': 'PPT', 'pptx': 'PPTX',
+    'png': 'IMG', 'jpg': 'IMG', 'jpeg': 'IMG', 'gif': 'IMG', 'webp': 'IMG',
+}
+
+def _format_from_url_or_filename(file_url, file_name):
+    """Derive format code from file URL or filename for API response."""
+    for s in (file_url, file_name):
+        if not s or not isinstance(s, str):
+            continue
+        # Take last path segment and get extension
+        part = s.split('/')[-1].split('?')[0]
+        if '.' in part:
+            ext = part.rsplit('.', 1)[1].lower()
+            if ext in EXTENSION_TO_FORMAT:
+                return EXTENSION_TO_FORMAT[ext]
+    return None
 
 # ============================================================
 # AUTHENTICATION
@@ -455,71 +498,38 @@ def resource_upload(element_id):
     
     file_format_id = file_format['id'] if file_format else None
     
-    # Store file based on type
-    if extension in BLOB_EXTENSIONS:
-        # Store in database as BLOB
-        file_data = file.read()
-        execute_db('''
-            INSERT INTO resources (element_id, title, description, resource_category_id,
-                                 file_format_id, audience, file_data, file_size_bytes, 
-                                 file_name, mime_type)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', [element_id, title, description, resource_category_id, file_format_id,
-              audience, file_data, len(file_data), filename, mime_type])
-        flash(f'Resource "{title}" uploaded successfully!', 'success')
-    else:
-        # Store in file system (PPTX, etc.)
-        import uuid
-        unique_filename = f"{uuid.uuid4()}_{filename}"
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-        file.save(file_path)
-        
-        execute_db('''
-            INSERT INTO resources (element_id, title, description, resource_category_id,
-                                 file_format_id, audience, file_path, file_size_bytes,
-                                 file_name, mime_type)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', [element_id, title, description, resource_category_id, file_format_id,
-              audience, unique_filename, os.path.getsize(file_path), filename, mime_type])
-        flash(f'Resource "{title}" uploaded successfully!', 'success')
+    # Store all files on disk (works on Hostinger, Railway with Volume, etc.)
+    import uuid
+    unique_filename = f"{uuid.uuid4()}_{filename}"
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    file.save(file_path)
+
+    execute_db('''
+        INSERT INTO resources (element_id, title, description, resource_category_id,
+                             file_format_id, audience, file_path, file_size_bytes,
+                             file_name, mime_type)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', [element_id, title, description, resource_category_id, file_format_id,
+          audience, unique_filename, os.path.getsize(file_path), filename, mime_type])
+    flash(f'Resource "{title}" uploaded successfully!', 'success')
     
     return redirect(url_for('element_detail', element_id=element_id))
 
 @app.route('/resource/<int:resource_id>/download')
 @login_required
 def resource_download(resource_id):
-    """Download a resource"""
-    resource = query_db('''
-        SELECT r.*, ff.stored_in_db
-        FROM resources r
-        LEFT JOIN file_formats ff ON r.file_format_id = ff.id
-        WHERE r.id = ?
-    ''', [resource_id], one=True)
-    
+    """Download a resource (BLOB or file_path)"""
+    resource = query_db('SELECT r.* FROM resources r WHERE r.id = ?', [resource_id], one=True)
     if not resource:
         flash('Resource not found', 'danger')
         return redirect(url_for('index'))
-    
-    if resource['stored_in_db']:
-        # Serve from database BLOB
-        return send_file(
-            io.BytesIO(resource['file_data']),
-            mimetype=resource['mime_type'],
-            as_attachment=True,
-            download_name=resource['file_name']
-        )
-    else:
-        # Serve from file system
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], resource['file_path'])
-        if not os.path.exists(file_path):
-            flash('File not found on server', 'danger')
-            return redirect(url_for('index'))
-        return send_file(
-            file_path,
-            mimetype=resource['mime_type'],
-            as_attachment=True,
-            download_name=resource['file_name']
-        )
+    resolved = _resolve_resource_file(resource)
+    if not resolved:
+        flash('File not found on server', 'danger')
+        return redirect(url_for('index'))
+    return send_file(resolved[0], mimetype=resolved[1] or 'application/octet-stream',
+                     as_attachment=True, download_name=resolved[2])
 
 @app.route('/resource/<int:resource_id>/view')
 @login_required
@@ -557,55 +567,26 @@ def resource_view(resource_id):
             public_url = url_for('resource_public', token=token, _external=True)
             return render_template('pptx_viewer.html', resource=resource, is_localhost=False, viewer_url=public_url)
     
-    # For PDFs and images, serve directly (works everywhere)
-    if resource['stored_in_db']:
-        return send_file(
-            io.BytesIO(resource['file_data']),
-            mimetype=resource['mime_type'],
-            as_attachment=False
-        )
-    else:
-        file_path = resource['file_path'] if resource['file_path'].startswith('uploads') else os.path.join(app.config['UPLOAD_FOLDER'], resource['file_path'])
-        if not os.path.exists(file_path):
-            flash('File not found on server', 'danger')
-            return redirect(url_for('element_detail', element_id=resource['element_id']))
-        return send_file(
-            file_path,
-            mimetype=resource['mime_type'],
-            as_attachment=False
-        )
+    # For PDFs and images, serve directly (BLOB or file_path)
+    resolved = _resolve_resource_file(resource)
+    if not resolved:
+        flash('File not found on server', 'danger')
+        return redirect(url_for('element_detail', element_id=resource['element_id']))
+    return send_file(resolved[0], mimetype=resolved[1], as_attachment=False)
 
 @app.route('/resource/<int:resource_id>/raw')
 @login_required
 def resource_raw(resource_id):
     """Serve raw resource file (for embedding in viewers)"""
-    resource = query_db('''
-        SELECT r.*, ff.stored_in_db
-        FROM resources r
-        LEFT JOIN file_formats ff ON r.file_format_id = ff.id
-        WHERE r.id = ?
-    ''', [resource_id], one=True)
-    
+    resource = query_db('SELECT r.* FROM resources r WHERE r.id = ?', [resource_id], one=True)
     if not resource:
         flash('Resource not found', 'danger')
         return redirect(url_for('index'))
-    
-    if resource['stored_in_db']:
-        return send_file(
-            io.BytesIO(resource['file_data']),
-            mimetype=resource['mime_type'],
-            as_attachment=False
-        )
-    else:
-        file_path = resource['file_path'] if resource['file_path'].startswith('uploads') else os.path.join(app.config['UPLOAD_FOLDER'], resource['file_path'])
-        if not os.path.exists(file_path):
-            flash('File not found on server', 'danger')
-            return redirect(url_for('index'))
-        return send_file(
-            file_path,
-            mimetype=resource['mime_type'],
-            as_attachment=False
-        )
+    resolved = _resolve_resource_file(resource)
+    if not resolved:
+        flash('File not found on server', 'danger')
+        return redirect(url_for('index'))
+    return send_file(resolved[0], mimetype=resolved[1], as_attachment=False)
 
 @app.route('/resource/<int:resource_id>/signed_url')
 @login_required
@@ -627,34 +608,13 @@ def resource_public(token):
     except:
         return "This link has expired or is invalid. Please generate a new viewing link.", 403
     
-    # Serve the resource
-    resource = query_db('''
-        SELECT r.*, ff.stored_in_db
-        FROM resources r
-        LEFT JOIN file_formats ff ON r.file_format_id = ff.id
-        WHERE r.id = ?
-    ''', [resource_id], one=True)
-    
+    resource = query_db('SELECT r.* FROM resources r WHERE r.id = ?', [resource_id], one=True)
     if not resource:
         return "Resource not found", 404
-    
-    if resource['stored_in_db']:
-        return send_file(
-            io.BytesIO(resource['file_data']),
-            mimetype=resource['mime_type'],
-            as_attachment=False,
-            download_name=resource['file_name']
-        )
-    else:
-        file_path = resource['file_path'] if resource['file_path'].startswith('uploads') else os.path.join(app.config['UPLOAD_FOLDER'], resource['file_path'])
-        if not os.path.exists(file_path):
-            return "File not found on server", 404
-        return send_file(
-            file_path,
-            mimetype=resource['mime_type'],
-            as_attachment=False,
-            download_name=resource['file_name']
-        )
+    resolved = _resolve_resource_file(resource)
+    if not resolved:
+        return "File not found on server", 404
+    return send_file(resolved[0], mimetype=resolved[1], as_attachment=False, download_name=resolved[2])
 
 @app.route('/resource/<int:resource_id>/edit', methods=['POST'])
 @login_required
@@ -692,24 +652,23 @@ def resource_edit(resource_id):
 @login_required
 def resource_delete(resource_id):
     """Delete a resource"""
-    resource = query_db('''
-        SELECT r.*, ff.stored_in_db
-        FROM resources r
-        LEFT JOIN file_formats ff ON r.file_format_id = ff.id
-        WHERE r.id = ?
-    ''', [resource_id], one=True)
-    
+    resource = query_db('SELECT r.* FROM resources r WHERE r.id = ?', [resource_id], one=True)
     if not resource:
         flash('Resource not found', 'danger')
         return redirect(url_for('index'))
     
     element_id = resource['element_id']
     
-    # Delete file from file system if applicable
-    if not resource['stored_in_db'] and resource['file_path']:
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], resource['file_path'])
-        if os.path.exists(file_path):
-            os.remove(file_path)
+    # Delete file from file system if stored on disk
+    if resource.get('file_path'):
+        fp = resource['file_path'].lstrip('/')
+        if '..' not in fp and not fp.startswith('/'):
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], fp)
+            if os.path.exists(file_path):
+                try:
+                    os.remove(file_path)
+                except OSError:
+                    pass
     
     # Delete from database
     execute_db('DELETE FROM resources WHERE id = ?', [resource_id])
@@ -730,7 +689,7 @@ def api_root():
         'version': '1.0',
         'endpoints': {
             'year_levels': f'{base}/api/year-levels',
-            'clusters': f'{base}/api/clusters?year=F|Y1|Y2',
+            'clusters': f'{base}/api/clusters?year=level-00|level-01|level-02',
             'cluster_detail': f'{base}/api/cluster/<cluster_number>',
             'resource_download': f'{base}/api/resource/<id>/download',
             'stats': f'{base}/api/stats'
@@ -741,9 +700,95 @@ def _row_to_dict(row):
     """Convert sqlite3.Row to dict for JSON serialization"""
     return dict(row) if row else None
 
+
+def _slugify_path_segment(seg):
+    """Match frontend toSlug: lowercase, spaces/underscores → hyphens, keep &."""
+    if not seg or not isinstance(seg, str):
+        return seg
+    s = seg.strip()
+    if not s:
+        return s
+    s = re.sub(r'\s+&\s+', '-&-', s)
+    s = re.sub(r'[\s_]+', '-', s)
+    s = s.lower()
+    s = re.sub(r'-+', '-', s).strip('-')
+    return s
+
+
+def _slugify_path(path_after_level):
+    """Slugify path after level to match Hostinger (same as frontend slugifyPath)."""
+    if not path_after_level or not isinstance(path_after_level, str):
+        return path_after_level
+    try:
+        decoded = unquote(path_after_level.replace('+', ' '))
+    except Exception:
+        decoded = path_after_level
+    segments = decoded.split('/')
+    out = []
+    for seg in segments:
+        slug = _slugify_path_segment(seg)
+        out.append(quote(slug, safe='') if slug else seg)
+    return '/'.join(out)
+
+
+def _normalise_file_url(file_url):
+    """Rewrite to Hostinger: https://api.theyintercept.com.au/00-learning-sequences/level-0x/...
+    Files are at public_html/00-learning-sequences/. Handles old api/files/Level0x and /api/00-learning-sequences/ inputs.
+    Slugifies path after level to match frontend and Hostinger file layout."""
+    if not file_url or not isinstance(file_url, str):
+        return file_url
+    # Hostinger: learning sequence PDFs are on main domain (theyintercept.com.au), not api subdomain
+    base = 'https://theyintercept.com.au'
+    file_prefix = '/00-learning-sequences'
+    # Already correct (and optionally re-slugify path after level for consistency)
+    if file_url.startswith(base + file_prefix + '/'):
+        rest = file_url[len(base + file_prefix + '/'):].lstrip('/')
+        parts = rest.split('/', 1)
+        if parts and parts[0] in ('level-00', 'level-01', 'level-02'):
+            path_after = parts[1] if len(parts) > 1 else ''
+            if path_after:
+                slugged = _slugify_path(path_after)
+                return base + file_prefix + '/' + parts[0] + '/' + slugged
+        return file_url
+    # Strip any host to get path
+    if '://' in file_url:
+        path_only = file_url.split('://', 1)[1].split('/', 1)[-1] if '/' in file_url.split('://', 1)[1] else ''
+    else:
+        path_only = file_url.lstrip('/')
+    path_only = '/' + path_only if path_only else ''
+    level_map = {'Level00': 'level-00', 'Level01': 'level-01', 'Level02': 'level-02'}
+    # Old API path: /api/files/Level01/...
+    if '/api/files/' in path_only:
+        idx = path_only.find('/api/files/') + len('/api/files/')
+        rest = path_only[idx:].lstrip('/')
+        parts = rest.split('/', 1)
+        if parts and parts[0] in level_map:
+            path_after = parts[1] if len(parts) > 1 else ''
+            slugged = _slugify_path(path_after)
+            return base + file_prefix + '/' + level_map[parts[0]] + ('/' + slugged if slugged else '')
+    # Already /api/00-learning-sequences/ but wrong host
+    if '/api/00-learning-sequences/' in path_only:
+        idx = path_only.find('/api/00-learning-sequences/') + len('/api/00-learning-sequences/')
+        path_after = path_only[idx:]
+        slugged = _slugify_path(path_after)
+        return base + file_prefix + '/' + slugged
+    # /00-learning-sequences/...
+    if '/00-learning-sequences/' in path_only:
+        idx = path_only.find('/00-learning-sequences/') + len('/00-learning-sequences/')
+        path_after = path_only[idx:]
+        slugged = _slugify_path(path_after)
+        return base + file_prefix + '/' + slugged
+    # Bare level-00|level-01|level-02/... (e.g. https://api.../level-01/...)
+    for level in ('level-00', 'level-01', 'level-02'):
+        if path_only == '/' + level + '/' or path_only.startswith('/' + level + '/'):
+            path_after = path_only[len('/' + level):].lstrip('/')
+            slugged = _slugify_path(path_after)
+            return base + file_prefix + '/' + level + ('/' + slugged if slugged else '')
+    return file_url
+
 @app.route('/api/year-levels')
 def api_year_levels():
-    """List year levels (F, Y1, Y2, etc.)"""
+    """List year levels (level-00, level-01, level-02, etc.)"""
     rows = query_db('SELECT id, code, name, display_order FROM year_levels ORDER BY display_order')
     return jsonify([_row_to_dict(r) for r in rows])
 
@@ -783,11 +828,38 @@ def api_stats():
         ]
     })
 
+# Map website/year-levels v2 style codes to DB codes (production may use F, Y1, Y2...)
+YEAR_CODE_ALIASES = {
+    'level00': 'F', 'level01': 'Y1', 'level02': 'Y2', 'level03': 'Y3',
+    'level04': 'Y4', 'level05': 'Y5', 'level06': 'Y6',
+}
+
+def _normalize_year_code(code):
+    """Normalize for lookup: lowercase, no hyphens."""
+    if not code:
+        return ''
+    return (code or '').strip().lower().replace('-', '')
+
+def _resolve_year_code(year_code):
+    """Resolve request year param to DB code. Accepts level-00 (→ F), Y1, F, etc."""
+    norm = _normalize_year_code(year_code)
+    # First try direct match (e.g. level-00 in DB)
+    row = query_db('SELECT id, code FROM year_levels WHERE LOWER(TRIM(REPLACE(code, "-", ""))) = ?', [norm], one=True)
+    if row:
+        return row
+    # Map website codes to production DB codes (F, Y1, Y2, ...)
+    db_code = YEAR_CODE_ALIASES.get(norm)
+    if db_code:
+        row = query_db('SELECT id, code FROM year_levels WHERE code = ?', [db_code], one=True)
+        if row:
+            return row
+    return None
+
 @app.route('/api/clusters')
 def api_clusters():
-    """List clusters for a year level. ?year=F|Y1|Y2 (default: F)"""
-    year_code = request.args.get('year', 'F').upper()
-    year_level = query_db('SELECT id FROM year_levels WHERE code = ?', [year_code], one=True)
+    """List clusters for a year level. ?year=level-00|level-01|level-02 or F|Y1|Y2 (default: level-00)."""
+    year_code = (request.args.get('year') or 'level-00').strip()
+    year_level = _resolve_year_code(year_code)
     if not year_level:
         return jsonify({'error': f'Unknown year: {year_code}'}), 400
 
@@ -830,7 +902,7 @@ def api_clusters():
             el_dict = _row_to_dict(el)
             # Get resources for this element
             resources = query_db('''
-                SELECT r.id, r.title, r.file_name, r.audience,
+                SELECT r.id, r.title, r.file_name, r.audience, r.file_url, r.drive_url,
                        rc.name as category_name, rc.code as category_code,
                        ff.code as format_code
                 FROM resources r
@@ -840,18 +912,22 @@ def api_clusters():
                 ORDER BY rc.display_order, r.title
             ''', [el['id']])
             base_url = _api_base_url()
-            el_dict['resources'] = [
-                {
+            el_dict['resources'] = []
+            for r in resources:
+                file_url = _normalise_file_url(r['file_url'])
+                download_url = file_url if file_url else f"{base_url}/api/resource/{r['id']}/download"
+                format_code = _format_from_url_or_filename(r['file_url'], r['file_name']) or r['format_code']
+                el_dict['resources'].append({
                     'id': r['id'],
                     'title': r['title'],
                     'category': r['category_name'],
                     'category_code': r['category_code'],
-                    'format': r['format_code'],
+                    'format': format_code,
                     'audience': r['audience'],
-                    'download_url': f"{base_url}/api/resource/{r['id']}/download"
-                }
-                for r in resources
-            ]
+                    'download_url': download_url,
+                    'file_url': file_url,
+                    'drive_url': r['drive_url']
+                })
             cluster['elements'].append(el_dict)
         clusters.append(cluster)
 
@@ -889,28 +965,32 @@ def api_cluster_detail(cluster_number):
     result['elements'] = []
     for el in elements:
         el_dict = _row_to_dict(el)
+        el_dict['resources'] = []
         resources = query_db('''
-            SELECT r.id, r.title, r.file_name, r.audience,
-                   rc.name as category_name, rc.code as category_code,
-                   ff.code as format_code
+            SELECT r.id, r.title, r.file_name, r.audience, r.file_url, r.drive_url,
+               rc.name as category_name, rc.code as category_code,
+               ff.code as format_code
             FROM resources r
             LEFT JOIN resource_categories rc ON r.resource_category_id = rc.id
             LEFT JOIN file_formats ff ON r.file_format_id = ff.id
             WHERE r.element_id = ?
             ORDER BY rc.display_order, r.title
         ''', [el['id']])
-        el_dict['resources'] = [
-            {
+        for r in resources:
+            file_url = _normalise_file_url(r['file_url'])
+            download_url = file_url if file_url else f"{base_url}/api/resource/{r['id']}/download"
+            format_code = _format_from_url_or_filename(r['file_url'], r['file_name']) or r['format_code']
+            el_dict['resources'].append({
                 'id': r['id'],
                 'title': r['title'],
                 'category': r['category_name'],
                 'category_code': r['category_code'],
-                'format': r['format_code'],
+                'format': format_code,
                 'audience': r['audience'],
-                'download_url': f"{base_url}/api/resource/{r['id']}/download"
-            }
-            for r in resources
-        ]
+                'download_url': download_url,
+                'file_url': file_url,
+                'drive_url': r['drive_url']
+            })
         result['elements'].append(el_dict)
     return jsonify(result)
 
@@ -919,41 +999,76 @@ def api_resource_download(resource_id):
     """Public download/view for a resource (for website links).
     PDFs and images are served inline so browsers preview them directly.
     All other formats (DOCX, PPTX, etc.) are served as attachments."""
-    resource = query_db('''
-        SELECT r.*, ff.stored_in_db
-        FROM resources r
-        LEFT JOIN file_formats ff ON r.file_format_id = ff.id
-        WHERE r.id = ?
-    ''', [resource_id], one=True)
-    if not resource:
+    row = query_db('SELECT r.* FROM resources r WHERE r.id = ?', [resource_id], one=True)
+    if not row:
         return jsonify({'error': 'Resource not found'}), 404
+    # sqlite3.Row has no .get(); convert to dict for _resolve_resource_file and redirect logic
+    resource = {k: row[k] for k in row.keys()}
 
-    mime = resource['mime_type'] or 'application/octet-stream'
+    resolved = _resolve_resource_file(resource)
+    if not resolved:
+        # Redirect to file_url (e.g. production 00-learning-sequences) when file not stored locally.
+        # Use normalised URL to match Hostinger: public_html/00-learning-sequences/ (no /api/ in path)
+        file_url = resource.get('file_url')
+        if file_url and isinstance(file_url, str) and file_url.strip().startswith('http'):
+            redirect_url = _normalise_file_url(file_url.strip())
+            return redirect(redirect_url, code=302)
+        return jsonify({
+            'error': 'File not found',
+            'detail': 'Resource file is missing. Run scripts/extract_blobs_to_files.py locally, then upload the database and uploads folder to your server.'
+        }), 404
+
+    mime = resolved[1] or 'application/octet-stream'
     inline_types = {'application/pdf', 'image/png', 'image/jpeg', 'image/gif', 'image/webp'}
     as_attachment = mime not in inline_types
+    return send_file(
+        resolved[0],
+        mimetype=mime,
+        as_attachment=as_attachment,
+        download_name=resolved[2] or 'download'
+    )
 
-    # Prefer file_data (BLOB) — required for Railway; works for all formats including PPTX
-    if resource['file_data']:
-        return send_file(
-            io.BytesIO(resource['file_data']),
-            mimetype=mime,
-            as_attachment=as_attachment,
-            download_name=resource['file_name'] or 'download'
-        )
-    # Fallback: file_path (filesystem) — only works locally, not on Railway
-    if resource['file_path']:
-        file_path = resource['file_path'] if resource['file_path'].startswith('uploads') else os.path.join(app.config['UPLOAD_FOLDER'], resource['file_path'])
-        if os.path.exists(file_path):
-            return send_file(
-                file_path,
-                mimetype=mime,
-                as_attachment=as_attachment,
-                download_name=resource['file_name'] or 'download'
-            )
+# ============================================================
+# LEARNING SEQUENCE STATIC FILES (Hostinger 00-learning-sequences)
+# ============================================================
+# When the web server doesn't serve /00-learning-sequences/ directly, the API can
+# serve them. Set LEARNING_SEQUENCES_PATH to the full path of the folder on the server
+# (e.g. /home/uXXX/domains/api.theyintercept.com.au/public_html/00-learning-sequences).
+
+def _learning_sequences_root():
+    root = os.getenv('LEARNING_SEQUENCES_PATH', '').strip()
+    if root and os.path.isdir(root):
+        return root
+    return None
+
+@app.route('/api/debug-learning-sequences')
+def debug_learning_sequences():
+    """Safe debug: is LEARNING_SEQUENCES_PATH set and a valid directory? (no secrets)."""
+    raw = os.getenv('LEARNING_SEQUENCES_PATH', '')
+    root = _learning_sequences_root()
     return jsonify({
-        'error': 'File not found',
-        'detail': 'The file content is missing from the database. On Railway, files must be stored in the database (not on disk). Run migrate_to_blob.py locally to migrate Word/PPTX from file_path to file_data, then redeploy the database.'
-    }), 404
+        'LEARNING_SEQUENCES_PATH_set': bool(raw.strip()),
+        'path_is_directory': root is not None,
+        'resolved_path': root if root else '(not set or not a directory)',
+        'cwd': os.getcwd(),
+        'app_dir': os.path.dirname(os.path.abspath(__file__)),
+    })
+
+@app.route('/api/00-learning-sequences/<path:filepath>')
+def serve_00_learning_sequences(filepath):
+    """Serve PDFs and other files from the 00-learning-sequences folder (Hostinger)."""
+    root = _learning_sequences_root()
+    if not root:
+        return jsonify({
+            'error': 'Learning sequences path not configured',
+            'detail': 'Set LEARNING_SEQUENCES_PATH to the full path of 00-learning-sequences on the server.'
+        }), 404
+    if '..' in filepath or filepath.startswith('/'):
+        return jsonify({'error': 'Invalid path'}), 400
+    try:
+        return send_from_directory(root, filepath, as_attachment=False)
+    except Exception:
+        return jsonify({'error': 'File not found'}), 404
 
 # ============================================================
 # CLUSTER RESOURCES (REFERENCE MATERIALS)
